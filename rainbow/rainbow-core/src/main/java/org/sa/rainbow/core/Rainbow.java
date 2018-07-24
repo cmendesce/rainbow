@@ -33,6 +33,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.text.MessageFormat;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -47,6 +48,7 @@ import org.sa.rainbow.core.globals.Environment;
 import org.sa.rainbow.core.globals.ExitState;
 import org.sa.rainbow.util.Util;
 
+import static org.sa.rainbow.util.PropertiesUtils.*;
 /**
  * A singleton class that provides utilities for reading properties, and getting access to important Rainbow Framework
  * services.
@@ -256,16 +258,22 @@ public class Rainbow implements IRainbowEnvironment {
      * Determines and configures the paths to the Rainbow base installation and target configuration files
      */
     private void establishPaths () {
-        String cfgPath = System.getProperty (PROPKEY_CONFIG_PATH, RAINBOW_CONFIG_PATH); // The location of targets
-        String target = System.getProperty (PROPKEY_TARGET_NAME, DEFAULT_TARGET_NAME); // The target to use
-        String propFile = System.getProperty (PROPKEY_CONFIG_FILE, null);
+        String cfgPath = getEnvOrProperty(PROPKEY_CONFIG_PATH, DEFAULT_CONFIG_FILE);
+        String target = getEnvOrProperty(PROPKEY_TARGET_NAME, DEFAULT_TARGET_NAME);
+        String propFile = getEnvOrProperty(PROPKEY_CONFIG_FILE);
 
         m_props.setProperty (PROPKEY_CONFIG_PATH, cfgPath);
         m_props.setProperty (PROPKEY_TARGET_NAME, target);
         if (propFile != null) {
             m_props.setProperty (PROPKEY_CONFIG_FILE, propFile);
         }
-        m_basePath = Util.computeBasePath (cfgPath);
+
+        if (Paths.get(cfgPath).isAbsolute()) {
+            m_basePath = new File(cfgPath);
+        } else {
+            m_basePath = Util.computeBasePath (cfgPath);
+        }
+
         if (m_basePath == null) {
             String errorMsg = MessageFormat.format ("Configuration path {0} NOT found,  bailing.", cfgPath);
             LOGGER.error (errorMsg);
@@ -306,7 +314,7 @@ public class Rainbow implements IRainbowEnvironment {
         computeHostSpecificConfig ();
         String cfgFile = m_props.getProperty (PROPKEY_CONFIG_FILE, DEFAULT_CONFIG_FILE);
         List<String> cfgFiles = new ArrayList<> ();
-//        if (!cfgFile.equals (DEFAULT_CONFIG_FILE)) { 
+        //        if (!cfgFile.equals (DEFAULT_CONFIG_FILE)) { 
 //            // load commong config file first
 //            cfgFiles.add (DEFAULT_CONFIG_FILE);
 //        }
