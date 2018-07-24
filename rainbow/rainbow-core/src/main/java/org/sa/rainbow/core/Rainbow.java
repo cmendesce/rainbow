@@ -267,7 +267,7 @@ public class Rainbow implements IRainbowEnvironment {
         if (propFile != null) {
             m_props.setProperty (PROPKEY_CONFIG_FILE, propFile);
         }
-
+        
         if (Paths.get(cfgPath).isAbsolute()) {
             m_basePath = new File(cfgPath);
         } else {
@@ -380,10 +380,11 @@ public class Rainbow implements IRainbowEnvironment {
 
     public static String canonicalizeHost2IP (String host) {
         try {
-            host = InetAddress.getByName (host).getHostAddress ();
-        }
-        catch (UnknownHostException e) {
-            LOGGER.error (MessageFormat.format ("{0} could not be resolved to an IP using the given name.", host));
+            if (InetAddress.getLocalHost().isReachable(10000)) {
+                host = InetAddress.getByName(host).getHostAddress();
+            }
+        } catch (IOException e) {
+            LOGGER.error (MessageFormat.format ("{0} could not be resolved to an IP using the given name.", host), e);
         }
         return host;
     }
