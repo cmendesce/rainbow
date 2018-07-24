@@ -60,7 +60,6 @@ import org.sa.rainbow.core.ports.IMasterConnectionPort;
 import org.sa.rainbow.core.ports.IMasterConnectionPort.ReportType;
 import org.sa.rainbow.core.ports.RainbowPortFactory;
 import org.sa.rainbow.core.util.TypedAttributeWithValue;
-import org.sa.rainbow.gui.RainbowGUI;
 import org.sa.rainbow.translator.effectors.EffectorManager;
 import org.sa.rainbow.translator.effectors.IEffectorExecutionPort.Outcome;
 import org.sa.rainbow.util.Beacon;
@@ -239,6 +238,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
                         adaptationManager.setModelToManage (model);
 
                         adaptationManager.start ();
+                        log("Initializing adaptation manager " + adaptationManagerClass);
                     }
                     else {
                         m_reportingPort.error (RainbowComponentT.MASTER,
@@ -249,7 +249,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
                 } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
                         | ClassCastException e) {
                     m_reportingPort.error (RainbowComponentT.MASTER, MessageFormat
-                            .format ("Could not start the adaptation manager ''{0}''.", adaptationManagerClass), e);
+                    .format ("Could not start the adaptation manager ''{0}''.", adaptationManagerClass), e);
                 }
             }
             else {
@@ -288,7 +288,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
                 } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
                         | ClassCastException e) {
                     m_reportingPort.error (RainbowComponentT.MASTER, MessageFormat
-                            .format ("Could not start the adaptation executor ''{0}''.", adaptationExecutorClass), e);
+                    .format ("Could not start the adaptation executor ''{0}''.", adaptationExecutorClass), e);
                 }
 
             }
@@ -340,6 +340,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
             m_nonCompliantDelegates.add (delegatePort.getDelegateId ());
             beacon.mark ();
             LOGGER.info (MessageFormat.format ("Master created management connection with delegate {0}", delegateID));
+            requestDelegateConfiguration(delegateID);
             return delegatePort;
         } catch (NumberFormatException | RainbowConnectionException e) {
             LOGGER.error (MessageFormat.format (
@@ -357,14 +358,16 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     public void requestDelegateConfiguration (String delegateID) {
         IDelegateConfigurationPort delegate = m_delegateConfigurtationPorts.get (delegateID);
         if (delegate != null) {
-            LOGGER.info (MessageFormat.format ("Sending configuration information to {0}.", delegateID));
-            delegate.sendConfigurationInformation (filterPropertiesForDelegate (delegateID),
-                    filterProbesForDelegate (delegateID), filterEffectorsForDelegate (delegateID),
-                    filterGaugesForDelegate (delegateID));
+            Properties properties = filterPropertiesForDelegate(delegateID);
+            List<ProbeAttributes> probes = filterProbesForDelegate(delegateID);
+            List<EffectorAttributes> effectors = filterEffectorsForDelegate(delegateID);
+            List<GaugeInstanceDescription> gauges = filterGaugesForDelegate(delegateID);
+            LOGGER.info (MessageFormat.format ("Sending configuration information to {0}. Probes: {1}; Effectors: {2}; Gauges: {3}", delegateID, probes.size(), effectors.size(), gauges.size()));
+            delegate.sendConfigurationInformation (properties, probes, effectors, gauges);
         }
         else {
             LOGGER.error (
-                    MessageFormat.format ("Received configuration request from unknown delegate {0}.", delegateID));
+                MessageFormat.format ("Received configuration request from unknown delegate {0}.", delegateID));
         }
     }
 
@@ -733,53 +736,6 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
         return (IAdaptationExecutor<S> )m_adaptationExecutors.get (modelRef);
     }
 
-    public static void main (String[] args) throws RainbowException {
-
-        boolean showHelp = false;
-        boolean showGui = true;
-        int lastIdx = args.length - 1;
-        for (int i = 0; i <= lastIdx; i++) {
-            switch (args[i]) {
-            case "-h":
-                showHelp = true;
-                break;
-            case "-nogui":
-                showGui = false;
-                break;
-            default:
-                System.err.println ("Unrecognized or incomplete argument " + args[i]);
-                showHelp = true;
-                break;
-            }
-        }
-        if (showHelp) {
-            System.out.println ("Usage:\n" + "  system property options {default}:\n"
-                    + "    rainbow.target    name of target configuration {default}\n"
-                    + "    rainbow.config    top config directory (org.sa.rainbow.config)\n" + "  options: \n"
-                    + "    -h          Show this help message\n" + "    -nogui      Don't show the Rainbow GUI\n" + "\n"
-                    + "Option defaults are defined in <rainbow.target>/rainbow.properties");
-            System.exit (RainbowConstants.EXIT_VALUE_ABORT);
-        }
-
-        RainbowMaster master = new RainbowMaster ();
-        if (showGui) {
-            RainbowGUI gui = new RainbowGUI (master);
-            gui.display ();
-        }
-        master.initialize ();
-
-        RainbowDelegate localDelegate = new RainbowDelegate ();
-        localDelegate.initialize ();
-
-        master.start ();
-        localDelegate.start ();
-
-        if (!showGui) {
-            RainbowPortFactory.createMasterCommandPort ();
-        }
-
-    }
-
 
     @Override
     public RainbowComponentT getComponentType () {
@@ -790,6 +746,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     public void startProbes () {
         log ("Starting probes");
         for (IDelegateManagementPort delegate : m_delegates.values ()) {
+            log("Starting probes from " + delegate.getDelegateId() + " delegate.");
             delegate.startProbes ();
         }
     }
@@ -804,6 +761,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     @Override
     public void enableAdaptation (boolean enabled) {
         for (IAdaptationManager<?> am : m_adaptationManagers.values ()) {
+            log("Enabling adaptation manager " + am.getClass().getCanonicalName());
             am.setEnabled (enabled);
         }
     }

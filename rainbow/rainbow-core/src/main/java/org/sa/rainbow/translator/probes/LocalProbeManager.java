@@ -62,8 +62,7 @@ public class LocalProbeManager extends AbstractRainbowRunnable {
 
     @Override
     protected void log (String txt) {
-        // TODO Auto-generated method stub
-
+        LOGGER.info(txt);
     }
 
     @Override
@@ -202,6 +201,7 @@ public class LocalProbeManager extends AbstractRainbowRunnable {
         m_probesStarted = true;
         Collection<IProbe> probes = m_localProbes.values ();
         for (IProbe probe : probes) {
+            LOGGER.info("Trying to activate probe " + probe.name() + "@" + probe.location());
             probe.activate ();
         }
     }
