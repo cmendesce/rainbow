@@ -11,13 +11,18 @@
 	<modelVersion>4.0.0</modelVersion>
 	<!-- Group ID contains the project group. It is some sort of namespace and 
 		should follow java's conventions for packages. -->
-	<groupId>rainbow</groupId>
+	<parent>
+		<groupId>rainbow</groupId>
+		<artifactId>rainbow-framework</artifactId>
+		<version>2.2.0-SNAPSHOT</version>
+		<relativePath>../</relativePath>
+	</parent>
 	<!-- The name of the artifact. -->
 	<artifactId>rainbow-core</artifactId>
 	<!-- Should correspond to the packaging type: 'pom' for a super-pom, 'jar' 
 		for a Java library and 'war' to a web application. -->
 	<packaging>jar</packaging>
-	<!-- Version. This should *always* be a snapshot version by convention. 
+	<!-- Version. This should *always* be a snapshot version by convention.
 		Name should be <version-number>-SNAPSHOT. -->
 	<version>2.2.0-SNAPSHOT</version>
 	<!-- User readable name of the pom. -->
@@ -86,12 +91,6 @@
 				<role />
 			</roles>
 		</developer>
-		<developer>
-			<id>cmendesce</id>
-			<name>Carlos Mendes</name>
-			<email>cmendesce@gmail.com</email>
-			<timezone>0</timezone>
-		</developer>
 	</developers>
 
 	<!-- Other people who have contributed to the project. Each 'contributor' 
@@ -127,7 +126,7 @@
 	<build>
 		<!-- Build process extensions. -->
 		<extensions>
-			<!-- The wagon extension allows webdav access. This plugin is required 
+			<!-- The wagon extension allows webdav access. This plugin is required
 				to deploy to the repository. -->
 			<extension>
 				<groupId>org.apache.maven.wagon</groupId>
@@ -472,17 +471,6 @@
 		</profile>
 	</profiles>
 	<dependencies>
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.17</version>
-			<type>jar</type>
-		</dependency>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.11</version>
-		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-io</artifactId>
