@@ -23,18 +23,11 @@
  */
 package org.sa.rainbow.core;
 
+import java.io.File;
+import java.nio.file.Paths;
 import java.text.MessageFormat;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.sa.rainbow.core.adaptation.IAdaptationExecutor;
@@ -43,9 +36,7 @@ import org.sa.rainbow.core.adaptation.IEvaluable;
 import org.sa.rainbow.core.analysis.IRainbowAnalysis;
 import org.sa.rainbow.core.error.RainbowConnectionException;
 import org.sa.rainbow.core.error.RainbowException;
-import org.sa.rainbow.core.gauges.GaugeDescription;
-import org.sa.rainbow.core.gauges.GaugeInstanceDescription;
-import org.sa.rainbow.core.gauges.GaugeManager;
+import org.sa.rainbow.core.gauges.*;
 import org.sa.rainbow.core.globals.ExitState;
 import org.sa.rainbow.core.models.EffectorDescription;
 import org.sa.rainbow.core.models.EffectorDescription.EffectorAttributes;
@@ -60,8 +51,12 @@ import org.sa.rainbow.core.ports.IMasterConnectionPort;
 import org.sa.rainbow.core.ports.IMasterConnectionPort.ReportType;
 import org.sa.rainbow.core.ports.RainbowPortFactory;
 import org.sa.rainbow.core.util.TypedAttributeWithValue;
+import org.sa.rainbow.translator.effectors.EffectorLoader;
 import org.sa.rainbow.translator.effectors.EffectorManager;
 import org.sa.rainbow.translator.effectors.IEffectorExecutionPort.Outcome;
+import org.sa.rainbow.translator.effectors.IEffectorLoader;
+import org.sa.rainbow.translator.probes.IProbeLoader;
+import org.sa.rainbow.translator.probes.ProbeLoader;
 import org.sa.rainbow.util.Beacon;
 import org.sa.rainbow.util.RainbowConfigurationChecker;
 import org.sa.rainbow.util.RainbowConfigurationChecker.Problem;
@@ -110,13 +105,50 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
 
     private Boolean m_initialized = Boolean.FALSE;
 
+    private IGaugeLoader    m_gaugeLoader;
+    private IEffectorLoader m_effectorLoader;
+    private IProbeLoader    m_probeLoader;
+
     public void setRainbowEnvironment (IRainbowEnvironment env) {
         m_rainbowEnvironment = env;
     }
 
-    public RainbowMaster () {
+    public RainbowMaster(IGaugeLoader gaugeLoader, IEffectorLoader effectorLoader, IProbeLoader probeLoader) {
         super ("Rainbow Master");
         m_rainbowEnvironment.setMaster (this);
+
+        m_gaugeLoader = gaugeLoader;
+        if (m_gaugeLoader == null) {
+            File gaugeSpec = Util.getRelativeToPath (Rainbow.instance ().getTargetPath (),
+                    Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_GAUGES_PATH));
+            m_gaugeLoader = new GaugeLoader(gaugeSpec);
+        }
+
+        m_effectorLoader = effectorLoader;
+        if (m_effectorLoader == null) {
+            String effectorPath = Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_EFFECTORS_PATH);
+            if (effectorPath == null) {
+                Util.logger ().error (MessageFormat.format ("No property defined for ''{0}''. No effectors loaded.",
+                        RainbowConstants.PROPKEY_EFFECTORS_PATH));
+            }
+            File effectorFile = Util.getRelativeToPath (Rainbow.instance ().getTargetPath (), effectorPath);
+            m_effectorLoader = new EffectorLoader(effectorFile);
+        }
+
+        m_probeLoader = probeLoader;
+        if (m_probeLoader == null) {
+            String probePath = Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_PROBES_PATH);
+            if (probePath == null) {
+                Util.logger ().error (MessageFormat.format ("No property defined for ''{0}''. No probes loaded.",
+                        RainbowConstants.PROPKEY_PROBES_PATH));
+            }
+            File probeFile = Util.getRelativeToPath (Rainbow.instance ().getTargetPath (), probePath);
+            m_probeLoader = new ProbeLoader(probeFile);
+        }
+    }
+
+    public RainbowMaster () {
+        this (null, null, null);
     }
 
     public void initialize () throws RainbowException {
@@ -666,7 +698,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     public ProbeDescription probeDesc () {
         synchronized (m_initialized) {
             if (m_probeDesc == null) {
-                m_probeDesc = YamlUtil.loadProbeDesc ();
+                m_probeDesc = m_probeLoader.load();
             }
             return m_probeDesc;
         }
@@ -676,7 +708,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     public EffectorDescription effectorDesc () {
         synchronized (m_initialized) {
             if (m_effectorDesc == null) {
-                m_effectorDesc = YamlUtil.loadEffectorDesc ();
+                m_effectorDesc = m_effectorLoader.load ();
             }
             return m_effectorDesc;
         }
@@ -686,7 +718,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     public GaugeDescription gaugeDesc () {
         synchronized (m_initialized) {
             if (m_gaugeDesc == null) {
-                m_gaugeDesc = YamlUtil.loadGaugeSpecs ();
+                m_gaugeDesc = m_gaugeLoader.load ();
             }
             return m_gaugeDesc;
         }
