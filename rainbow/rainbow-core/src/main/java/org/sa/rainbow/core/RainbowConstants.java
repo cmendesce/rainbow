@@ -147,12 +147,18 @@ public interface RainbowConstants {
 //    /** Rainbow customization parameter:  Alpha value of exponential average for
 //     *  model properties, expAvg = (1 - alpha) * expAvg + alpha * newVal */
     String PROPKEY_MODEL_ALPHA = "customize.model.expavg.alpha";
+//    /** Rainbow customization parameter: Gauge Factory class */
+    String PROPKEY_GAUGES_FACTORY = "customize.gauges.factory";
 //    /** Rainbow customization parameter: Gauge Description file path */
     String PROPKEY_GAUGES_PATH = "customize.gauges.path";
+//    /** Rainbow customization parameter: Probe Description factory class */
+    String PROPKEY_PROBES_FACTORY = "customize.probes.factory";
 //    /** Rainbow customization parameter: Probe Description file path */
     String PROPKEY_PROBES_PATH = "customize.probes.path";
 //    /** Rainbow customization parameter:  Path to the architectural operator mapping file */
 //    public static final String PROPKEY_OP_MAP_PATH = "customize.archop.map.path";
+//    /** Rainbow customization parameter: Effector Description factory */
+    String PROPKEY_EFFECTORS_FACTORY = "customize.effectors.factory";
 //    /** Rainbow customization parameter: Effector Description file path */
     String PROPKEY_EFFECTORS_PATH = "customize.effectors.path";
 //    /** Rainbow customization parameter:  Path to the Stitch scripts */

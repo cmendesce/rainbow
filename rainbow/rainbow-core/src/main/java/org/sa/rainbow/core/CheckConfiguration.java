@@ -25,12 +25,18 @@ package org.sa.rainbow.core;
 
 
 import org.sa.rainbow.core.gauges.GaugeDescription;
+import org.sa.rainbow.core.gauges.GaugeLoader;
 import org.sa.rainbow.core.models.EffectorDescription;
 import org.sa.rainbow.core.models.ModelsManager;
 import org.sa.rainbow.core.models.ProbeDescription;
+import org.sa.rainbow.translator.effectors.EffectorLoader;
+import org.sa.rainbow.translator.probes.ProbeLoader;
 import org.sa.rainbow.util.RainbowConfigurationChecker;
 import org.sa.rainbow.util.RainbowConfigurationChecker.Problem;
-import org.sa.rainbow.util.YamlUtil;
+import org.sa.rainbow.util.Util;
+
+import java.io.File;
+import java.text.MessageFormat;
 
 public class CheckConfiguration {
 
@@ -40,16 +46,30 @@ public class CheckConfiguration {
         System.out.println ("Loading YAMLs for target: " + Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_TARGET_NAME));
         System.out.print ("Loading probes...");
         System.out.flush ();
-        final ProbeDescription loadProbeDesc = YamlUtil.loadProbeDesc ();
+        String probePath = Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_PROBES_PATH);
+        if (probePath == null) {
+            Util.logger ().error (MessageFormat.format ("No property defined for ''{0}''. No probes loaded.",
+                    RainbowConstants.PROPKEY_PROBES_PATH));
+        }
+        File probeFile = Util.getRelativeToPath (Rainbow.instance ().getTargetPath (), probePath);
+        final ProbeDescription loadProbeDesc = new ProbeLoader(probeFile).load();
         System.out.println ("found " + loadProbeDesc.probes.size () + " probes");
         System.out.print ("Loading effecors...");
         System.out.flush ();
-        final EffectorDescription loadEffectorDesc = YamlUtil.loadEffectorDesc ();
+        String effectorPath = Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_EFFECTORS_PATH);
+        if (effectorPath == null) {
+            Util.logger ().error (MessageFormat.format ("No property defined for ''{0}''. No effectors loaded.",
+                    RainbowConstants.PROPKEY_EFFECTORS_PATH));
+        }
+        File effectorFile = Util.getRelativeToPath (Rainbow.instance ().getTargetPath (), effectorPath);
+        final EffectorDescription loadEffectorDesc = new EffectorLoader(effectorFile).load();
         System.out.println ("found " + loadEffectorDesc.effectorTypes.size () + " effector types, "
                 + loadEffectorDesc.effectors.size () + " effectors");
         System.out.print ("Loading gauges...");
         System.out.flush ();
-        final GaugeDescription loadGaugeSpecs = YamlUtil.loadGaugeSpecs ();
+        File gaugeSpec = Util.getRelativeToPath (Rainbow.instance ().getTargetPath (),
+                Rainbow.instance ().getProperty (RainbowConstants.PROPKEY_GAUGES_PATH));
+        final GaugeDescription loadGaugeSpecs = new GaugeLoader(gaugeSpec).load();
         System.out.println ("found " + loadGaugeSpecs.typeSpec.size () + " types, " + loadGaugeSpecs.instSpec.size ()
         + " instances");
 //        System.out.print ("Loading preferences...");

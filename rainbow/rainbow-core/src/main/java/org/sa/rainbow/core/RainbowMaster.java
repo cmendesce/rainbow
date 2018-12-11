@@ -23,12 +23,6 @@
  */
 package org.sa.rainbow.core;
 
-import java.io.File;
-import java.nio.file.Paths;
-import java.text.MessageFormat;
-import java.util.*;
-import java.util.Map.Entry;
-
 import org.apache.log4j.Logger;
 import org.sa.rainbow.core.adaptation.IAdaptationExecutor;
 import org.sa.rainbow.core.adaptation.IAdaptationManager;
@@ -40,16 +34,11 @@ import org.sa.rainbow.core.gauges.*;
 import org.sa.rainbow.core.globals.ExitState;
 import org.sa.rainbow.core.models.EffectorDescription;
 import org.sa.rainbow.core.models.EffectorDescription.EffectorAttributes;
-import org.sa.rainbow.core.models.ModelReference;
 import org.sa.rainbow.core.models.ModelsManager;
 import org.sa.rainbow.core.models.ProbeDescription;
 import org.sa.rainbow.core.models.ProbeDescription.ProbeAttributes;
-import org.sa.rainbow.core.ports.IDelegateConfigurationPort;
-import org.sa.rainbow.core.ports.IDelegateManagementPort;
-import org.sa.rainbow.core.ports.IMasterCommandPort;
-import org.sa.rainbow.core.ports.IMasterConnectionPort;
+import org.sa.rainbow.core.ports.*;
 import org.sa.rainbow.core.ports.IMasterConnectionPort.ReportType;
-import org.sa.rainbow.core.ports.RainbowPortFactory;
 import org.sa.rainbow.core.util.TypedAttributeWithValue;
 import org.sa.rainbow.translator.effectors.EffectorLoader;
 import org.sa.rainbow.translator.effectors.EffectorManager;
@@ -62,7 +51,11 @@ import org.sa.rainbow.util.RainbowConfigurationChecker;
 import org.sa.rainbow.util.RainbowConfigurationChecker.Problem;
 import org.sa.rainbow.util.RainbowConfigurationChecker.ProblemT;
 import org.sa.rainbow.util.Util;
-import org.sa.rainbow.util.YamlUtil;
+
+import java.io.File;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.Map.Entry;
 
 public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCommandPort, IRainbowMaster {
 
@@ -90,9 +83,9 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     private Collection<IRainbowAnalysis> m_analyses = Collections.emptySet ();
 
 
-    private Map<String, IAdaptationManager<?>> m_adaptationManagers = new HashMap<> ();
+    private List<IAdaptationManager<?>> m_adaptationManagers = Collections.emptyList ();
 
-    private final Map<String, IAdaptationExecutor<?>> m_adaptationExecutors = new HashMap<> ();
+    private List<IAdaptationExecutor<?>> m_adaptationExecutors = Collections.emptyList ();
 
 
     private Collection<EffectorManager> m_effectorManagers = Collections.emptySet ();
@@ -109,11 +102,13 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     private IEffectorLoader m_effectorLoader;
     private IProbeLoader    m_probeLoader;
 
+    private RainbowComponentsInitializer m_initializer;
+
     public void setRainbowEnvironment (IRainbowEnvironment env) {
         m_rainbowEnvironment = env;
     }
 
-    public RainbowMaster(IGaugeLoader gaugeLoader, IEffectorLoader effectorLoader, IProbeLoader probeLoader) {
+    public RainbowMaster (IGaugeLoader gaugeLoader, IEffectorLoader effectorLoader, IProbeLoader probeLoader) {
         super ("Rainbow Master");
         m_rainbowEnvironment.setMaster (this);
 
@@ -148,7 +143,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
     }
 
     public RainbowMaster () {
-        this (null, null, null);
+        this(null, null, null);
     }
 
     public void initialize () throws RainbowException {
@@ -185,151 +180,15 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
      * @throws RainbowException
      */
     private void initializeRainbowComponents () throws RainbowException {
-        // Create a models manager
-        m_modelsManager = new ModelsManager ();
-        m_modelsManager.initialize (m_reportingPort);
-        m_modelsManager.start ();
 
-        // Create the global gauge manager that knows about all gauges
-        m_gaugeManager = new GaugeManager (gaugeDesc ());
-        m_gaugeManager.initialize (m_reportingPort);
-        m_gaugeManager.start ();
+        RainbowComponentsFactory factory = new RainbowComponentsFactory(m_rainbowEnvironment, m_reportingPort);
 
-        // Create effector managers from the Rainbow properties file
-        int effectorManagerSize = m_rainbowEnvironment.getProperty (RainbowConstants
-                .PROPKEY_EFFECTOR_MANAGER_COMPONENT_SIZE, 0);
-        m_effectorManagers = new LinkedList<> ();
-        for (int i = 0; i < effectorManagerSize; i++) {
-            String emProp = RainbowConstants.PROPKEY_EFFECTOR_MANAGER_COMPONENT + "_" + i;
-            String em = m_rainbowEnvironment.getProperty (emProp);
-            if (em != null) {
-                em = em.trim ();
-                try {
-                    @SuppressWarnings ("unchecked")
-                    Class<? extends EffectorManager> cls = (Class<? extends EffectorManager> )Class.forName (em);
-                    EffectorManager effMan = cls.newInstance ();
-                    m_effectorManagers.add (effMan);
-                    effMan.setEffectors (effectorDesc ());
-                    effMan.initialize (m_reportingPort);
-                    effMan.start ();
-                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
-                        | ClassCastException e) {
-                    m_reportingPort.error (RainbowComponentT.MASTER,
-                            MessageFormat.format ("Could not start effector manager ''{0}''", em), e);
-                }
-            }
-        }
-
-        // Create analyses from the Rainbow properties file
-        int analysisSize = m_rainbowEnvironment.getProperty (RainbowConstants.PROPKEY_ANALYSIS_COMPONENT_SIZE, 0);
-        m_analyses = new LinkedList<> ();
-        for (int i = 0; i < analysisSize; i++) {
-            String analysisProp = RainbowConstants.PROPKEY_ANALYSIS_COMPONENTS + "_" + i;
-            String an = m_rainbowEnvironment.getProperty (analysisProp);
-            if (an != null) {
-                an = an.trim ();
-                try {
-                    m_reportingPort.info (RainbowComponentT.MASTER, "Starting " + an);
-                    @SuppressWarnings ("unchecked")
-                    Class<? extends IRainbowAnalysis> cls = (Class<? extends IRainbowAnalysis> )Class.forName (an);
-                    IRainbowAnalysis analysis = cls.newInstance ();
-                    m_analyses.add (analysis);
-                    analysis.initialize (m_reportingPort);
-                    analysis.start ();
-                    String model = m_rainbowEnvironment.getProperty (RainbowConstants.PROPKEY_ANALYSIS_COMPONENTS + ".model_" + i);
-                    if (model != null) {
-                        analysis.setProperty ("model", model);
-                    }
-                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
-                        | ClassCastException e) {
-                    m_reportingPort.error (RainbowComponentT.MASTER,
-                            MessageFormat.format ("Could not start the analysis ''{0}''", an), e);
-                }
-            }
-        }
-
-        // Create adaptation managers from the Rainbow properties file
-        int adaptationManagerSize = m_rainbowEnvironment.getProperty (RainbowConstants.PROPKEY_ADAPTATION_MANAGER_SIZE, 0);
-        m_adaptationManagers = new HashMap<> ();
-        for (int i = 0; i < adaptationManagerSize; i++) {
-
-            String adaptationManagerProp = RainbowConstants.PROPKEY_ADAPTATION_MANAGER_CLASS + "_" + i;
-            String adaptationManagerClass = m_rainbowEnvironment.getProperty (adaptationManagerProp);
-            if (adaptationManagerClass != null) {
-                try {
-                    @SuppressWarnings ("unchecked")
-                    Class<? extends IAdaptationManager<?>> cls = (Class<? extends IAdaptationManager<?>> )Class
-                    .forName (adaptationManagerClass.trim ());
-                    IAdaptationManager<?> adaptationManager = cls.newInstance ();
-                    String amModel = RainbowConstants.PROPKEY_ADAPTATION_MANAGER_MODEL + "_" + i;
-                    String modelReference = m_rainbowEnvironment.getProperty (amModel);
-                    if (modelReference != null) {
-                        ModelReference model = Util.decomposeModelReference (modelReference);
-                        m_adaptationManagers.put (modelReference, adaptationManager);
-                        adaptationManager.initialize (m_reportingPort);
-                        adaptationManager.setModelToManage (model);
-
-                        adaptationManager.start ();
-                        log("Initializing adaptation manager " + adaptationManagerClass);
-                    }
-                    else {
-                        m_reportingPort.error (RainbowComponentT.MASTER,
-                                MessageFormat.format (
-                                        "There is no model reference for adapation manager ''{0}''. Need to set the property ''{1}''.",
-                                        adaptationManagerClass, amModel));
-                    }
-                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
-                        | ClassCastException e) {
-                    m_reportingPort.error (RainbowComponentT.MASTER, MessageFormat
-                    .format ("Could not start the adaptation manager ''{0}''.", adaptationManagerClass), e);
-                }
-            }
-            else {
-                m_reportingPort.warn (RainbowComponentT.MASTER,
-                        MessageFormat.format ("Could not find property ''{0}''", adaptationManagerProp));
-            }
-        }
-
-        // Create adaptation executors from the Rainbow properties file
-        int adaptationExecutorSize = m_rainbowEnvironment.getProperty (RainbowConstants.PROPKEY_ADAPTATION_EXECUTOR_SIZE, 0);
-
-        for (int i = 0; i < adaptationExecutorSize; i++) {
-            String adaptationExecutorProp = RainbowConstants.PROPKEY_ADAPTATION_EXECUTOR_CLASS + "_" + i;
-            String adaptationExecutorClass = m_rainbowEnvironment.getProperty (adaptationExecutorProp);
-            if (adaptationExecutorClass != null) {
-                try {
-                    @SuppressWarnings ("unchecked")
-                    Class<? extends IAdaptationExecutor<?>> cls = (Class<? extends IAdaptationExecutor<?>> )Class
-                    .forName (adaptationExecutorClass.trim ());
-                    IAdaptationExecutor<?> adaptationExecutor = cls.newInstance ();
-                    adaptationExecutor.initialize (m_reportingPort);
-                    String amModel = RainbowConstants.PROPKEY_ADAPTATION_EXECUTOR_MODEL + "_" + i;
-                    String modelReference = m_rainbowEnvironment.getProperty (amModel);
-                    if (modelReference != null) {
-                        ModelReference model = Util.decomposeModelReference (modelReference);
-                        adaptationExecutor.setModelToManage (model);
-                        m_adaptationExecutors.put (modelReference, adaptationExecutor);
-                        adaptationExecutor.start ();
-                    }
-                    else {
-                        m_reportingPort.error (RainbowComponentT.MASTER,
-                                MessageFormat.format (
-                                        "There is no model reference for adapation executor ''{0}''. Need to set the property ''{1}''.",
-                                        adaptationExecutorClass, amModel));
-                    }
-                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
-                        | ClassCastException e) {
-                    m_reportingPort.error (RainbowComponentT.MASTER, MessageFormat
-                    .format ("Could not start the adaptation executor ''{0}''.", adaptationExecutorClass), e);
-                }
-
-            }
-            else {
-                m_reportingPort.warn (RainbowComponentT.MASTER,
-                        MessageFormat.format ("Could not find property ''{0}''", adaptationExecutorProp));
-            }
-        }
-
+        m_modelsManager = factory.createModelsManager();
+        m_gaugeManager = factory.createGaugeManager();
+        m_effectorManagers = factory.createEffectorManagers();
+        m_analyses = factory.createAnalysis();
+        m_adaptationManagers = factory.createAdaptationManagers();
+        m_adaptationExecutors = factory.createAdaptationExecutors();
     }
 
     private void initializeConnections () throws RainbowConnectionException {
@@ -537,10 +396,10 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
         for (EffectorManager e : m_effectorManagers) {
             e.stop ();
         }
-        for (IAdaptationManager<?> a : m_adaptationManagers.values ()) {
+        for (IAdaptationManager<?> a : m_adaptationManagers) {
             a.stop ();
         }
-        for (IAdaptationExecutor<?> a : m_adaptationExecutors.values ()) {
+        for (IAdaptationExecutor<?> a : m_adaptationExecutors) {
             a.stop ();
         }
         super.stop ();
@@ -554,10 +413,10 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
         for (EffectorManager e : m_effectorManagers) {
             e.restart ();
         }
-        for (IAdaptationManager<?> a : m_adaptationManagers.values ()) {
+        for (IAdaptationManager<?> a : m_adaptationManagers) {
             a.restart ();
         }
-        for (IAdaptationExecutor<?> a : m_adaptationExecutors.values ()) {
+        for (IAdaptationExecutor<?> a : m_adaptationExecutors) {
             a.restart ();
         }
         super.restart ();
@@ -755,7 +614,12 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
 
     @SuppressWarnings ("unchecked")
     public <S extends IEvaluable> IAdaptationManager<S> adaptationManagerForModel (String modelRef) {
-        return (IAdaptationManager<S> )m_adaptationManagers.get (modelRef);
+        for (IAdaptationManager adaptationManager : m_adaptationManagers) {
+            if (adaptationManager.getManagedModel().toString().equals(modelRef)) {
+                return adaptationManager;
+            }
+        }
+        return null;
     }
 
 //    public EffectorManager effectorManager () {
@@ -765,7 +629,12 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
 
     @SuppressWarnings ("unchecked")
     public <S> IAdaptationExecutor<S> strategyExecutor (String modelRef) {
-        return (IAdaptationExecutor<S> )m_adaptationExecutors.get (modelRef);
+        for (IAdaptationExecutor adaptationExecutor : m_adaptationExecutors) {
+            if (adaptationExecutor.getManagedModel().toString().equals(modelRef)) {
+                return adaptationExecutor;
+            }
+        }
+        return null;
     }
 
 
@@ -792,7 +661,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
 
     @Override
     public void enableAdaptation (boolean enabled) {
-        for (IAdaptationManager<?> am : m_adaptationManagers.values ()) {
+        for (IAdaptationManager<?> am : m_adaptationManagers) {
             log("Enabling adaptation manager " + am.getClass().getCanonicalName());
             am.setEnabled (enabled);
         }
@@ -800,7 +669,7 @@ public class RainbowMaster extends AbstractRainbowRunnable implements IMasterCom
 
     public boolean isAdaptationEnabled () {
         boolean enabled = true;
-        for (IAdaptationManager<?> am : m_adaptationManagers.values ()) {
+        for (IAdaptationManager<?> am : m_adaptationManagers) {
             enabled &= am.isEnabled ();
         }
         return enabled;

@@ -225,7 +225,7 @@
 			 <configuration>
 				 <visitor>true</visitor>
 				 <listener>false</listener>
-				 <grammars>Stitch.g4</grammars>
+				 <grammars>IM.g4</grammars>
 				 <outputDirectory>${project.build.directory}/generated-sources/antlr/org/sa/rainbow/stitch/parser</outputDirectory>
 				 <sourceDirectory>src/main/resources/antlr4/org/sa/rainbow/stitch/parser</sourceDirectory>
 				 <arguments>

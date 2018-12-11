@@ -45,4 +45,6 @@ public interface IAdaptationExecutor<S> extends IRainbowRunnable {
     IModelDSBusPublisherPort getOperationPublishingPort ();
 
     IRainbowReportingPort getReportingPort ();
+
+    ModelReference getManagedModel();
 }

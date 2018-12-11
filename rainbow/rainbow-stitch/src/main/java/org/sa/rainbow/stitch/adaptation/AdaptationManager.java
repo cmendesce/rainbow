@@ -23,27 +23,6 @@
  */
 package org.sa.rainbow.stitch.adaptation;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
 import org.acmestudio.acme.element.IAcmeSystem;
 import org.apache.commons.lang.time.StopWatch;
 import org.sa.rainbow.core.AbstractRainbowRunnable;
@@ -60,14 +39,9 @@ import org.sa.rainbow.core.models.IModelInstance;
 import org.sa.rainbow.core.models.ModelReference;
 import org.sa.rainbow.core.models.UtilityFunction;
 import org.sa.rainbow.core.models.UtilityPreferenceDescription;
-import org.sa.rainbow.core.ports.IModelChangeBusPort;
-import org.sa.rainbow.core.ports.IModelChangeBusSubscriberPort;
+import org.sa.rainbow.core.ports.*;
 import org.sa.rainbow.core.ports.IModelChangeBusSubscriberPort.IRainbowChangeBusSubscription;
 import org.sa.rainbow.core.ports.IModelChangeBusSubscriberPort.IRainbowModelChangeCallback;
-import org.sa.rainbow.core.ports.IModelsManagerPort;
-import org.sa.rainbow.core.ports.IRainbowAdaptationEnqueuePort;
-import org.sa.rainbow.core.ports.IRainbowReportingPort;
-import org.sa.rainbow.core.ports.RainbowPortFactory;
 import org.sa.rainbow.model.acme.AcmeModelInstance;
 import org.sa.rainbow.model.acme.AcmeRainbowOperationEvent.CommandEventT;
 import org.sa.rainbow.stitch.Ohana;
@@ -78,6 +52,13 @@ import org.sa.rainbow.stitch.error.IStitchProblem;
 import org.sa.rainbow.stitch.visitor.Stitch;
 import org.sa.rainbow.util.Beacon;
 import org.sa.rainbow.util.Util;
+
+import java.io.*;
+import java.nio.channels.FileChannel;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The Rainbow Adaptation Engine... Currently implements a learner interface to interact with Nick Lynn's learner.
@@ -220,6 +201,11 @@ public final class AdaptationManager extends AbstractRainbowRunnable
 //        }
         initAdaptationRepertoire ();
 
+    }
+
+    @Override
+    public ModelReference getManagedModel() {
+        return Util.decomposeModelReference(m_modelRef);
     }
 
     /*
