@@ -55,6 +55,7 @@ public class ZNNCommandFactory extends AcmeModelCommandFactory {
     protected void fillInCommandMap () {
         super.fillInCommandMap ();
         m_commandMap.put ("setResponseTime".toLowerCase (), SetResponseTimeCmd.class);
+        m_commandMap.put ("setExperRespTime".toLowerCase (), SetExperRespTimeCmd.class);
         m_commandMap.put ("setLoad".toLowerCase (), SetLoadCmd.class);
         m_commandMap.put ("connectNewServer".toLowerCase (), NewServerCmd.class);
         m_commandMap.put ("deleteServer".toLowerCase (), RemoveServerCmd.class);
@@ -110,13 +111,22 @@ public class ZNNCommandFactory extends AcmeModelCommandFactory {
                                                    .toString (aboveMalicious));
     }
 
+    public SetExperRespTimeCmd setExperRespTime (IAcmeComponent client, float rt) {
+        assert client.declaresType ("ClientT");
+        if (ModelHelper.getAcmeSystem (client) != m_modelInstance.getModelInstance ())
+            throw new IllegalArgumentException (
+                    "Cannot create a command for a component that is not part of the system");
+        return new SetExperRespTimeCmd ((AcmeModelInstance) m_modelInstance,
+                                       client.getQualifiedName (), Float.toString (rt));
+    }
+
     public SetResponseTimeCmd setResponseTimeCmd (IAcmeComponent client, float rt) {
         assert client.declaresType ("ClientT");
         if (ModelHelper.getAcmeSystem (client) != m_modelInstance.getModelInstance ())
             throw new IllegalArgumentException (
                     "Cannot create a command for a component that is not part of the system");
         return new SetResponseTimeCmd ((AcmeModelInstance) m_modelInstance,
-                                       client.getQualifiedName (), Float.toString (rt));
+                client.getQualifiedName (), Float.toString (rt));
     }
 
     public SetLoadCmd setLoadCmd (IAcmeComponent server, float load) {

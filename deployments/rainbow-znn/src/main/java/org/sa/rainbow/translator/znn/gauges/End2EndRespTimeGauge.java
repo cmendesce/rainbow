@@ -50,7 +50,8 @@ public class End2EndRespTimeGauge extends RegularPatternGauge {
 
     /** List of values reported by this Gauge */
     private static final String[] valueNames = {
-            "end2endRespTime(*)"
+            "end2endRespTime(*)",
+            "setResponseTime(*)"
     };
     private static final String DEFAULT = "DEFAULT";
 
